@@ -1,0 +1,79 @@
+from SSDpy.constitutive.constlaws import boucWen
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+from time import time
+
+def boucWen_1DOF(y,t,loading,p,mass):
+    """ Dynamics of a 1-DOF mass-spring system with Bouc-Wen model for the spring, see [1]
+    """
+    A = np.diag([mass, mass, 1])
+
+    Fint, dz = boucWen(y[:3], p)  # internal forces in the Bouc-Wen model
+
+    Fext = applied_load(t, loading)
+    b = np.array([mass * y[1], Fext - Fint, dz])
+
+    dydt = np.linalg.solve(A, b)
+
+    return dydt
+
+def applied_load(t, loading):
+    """ Applied load to the system
+    """
+    F = loading['F0'] * np.sin( loading['Omega']*t) * (1 - np.exp(-t/20))
+    return F
+
+def fwd_boucWen_1DOF(t, loading, p, mass=1, y0 = [0, 0, 0]):
+    """ Forward Bouc-Wen model for 1-DOF mass-spring system
+    """
+
+    # Solve ODE
+    y = odeint(boucWen_1DOF, y0, t, args=(loading,p,mass))
+    
+    # Store internal forces
+    Fint=[]
+    for i in range(0, len(t)):
+        f, dz = boucWen(y[i,:], p) 
+        Fint.append(f)
+
+    sol = {'t': t,  # time (s)
+            'y': y,  # structural displacement (m)
+            'Fint': Fint}  # internal force (N)
+    
+    return sol
+
+
+params = {'gamma': 0.05, 'beta': 0.5, 'A': 1, 'n': 3, 'c0': 0.5, 'k0': 1, 'a': 0.3}
+
+t = np.linspace(0, 120, 2400)
+loading = {'F0': 5 , 'Omega': 1.0}
+
+print('Start ODE integration. Running...')
+start_time = time()
+
+sol = fwd_boucWen_1DOF(t,loading,params)
+
+elapsed_time = time() - start_time
+print('Stop ODE integration, elapsed time: %.2f s' % elapsed_time)
+
+
+plt.figure()
+plt.subplot(1,2,1)
+plt.plot(sol['y'][:,0],sol['Fint'])
+plt.xlabel('Displacement (m)')
+plt.ylabel('Internal force (N)')
+
+plt.subplot(1,2,2)
+plt.plot(t,sol['y'][:,0],label='displacement')
+plt.plot(t,sol['y'][:,2],label='z')
+plt.xlabel('Time (s)')
+plt.ylabel('Displacement (m)')
+plt.legend()
+
+plt.show()
+
+print("Done.")
+
+elapsed_time = time() - start_time
+print('Stop ODE integration, elapsed time: %.2f s' % elapsed_time)
