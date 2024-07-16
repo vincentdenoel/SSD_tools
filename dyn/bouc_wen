@@ -1,8 +1,10 @@
 from SSDpy.constitutive.constlaws import boucWen
+from SSDpy.dyn.EOMsolvers import CHNL
 import numpy as np
 from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 from time import time
+from scipy.signal import find_peaks
 
 def boucWen_1DOF(y,t,loading,p,mass):
     """ Dynamics of a 1-DOF mass-spring system with Bouc-Wen model for the spring, see [1]
@@ -18,50 +20,131 @@ def boucWen_1DOF(y,t,loading,p,mass):
 
     return dydt
 
+
 def applied_load(t, loading):
     """ Applied load to the system
     """
     F = loading['F0'] * np.sin( loading['Omega']*t) * (1 - np.exp(-t/20))
+
+    # Add noise, interpolated from the noise in the loading
+    F = F + np.interp(t, loading['t_noise'], loading['F_noise'])
+    
     return F
 
-def fwd_boucWen_1DOF(t, loading, p, mass=1, y0 = [0, 0, 0]):
-    """ Forward Bouc-Wen model for 1-DOF mass-spring system
+def CHNL_fExt(t, param):
+    """ External force function for CHNL solver
     """
+    f = applied_load(t, param['loading'])
+    
+    Fext = np.array([f,0])
+    return Fext
 
+def CHNL_fInt(q, v, p):
+
+    u = q[0]
+    z  = q[1]
+    du = v[0]
+    dz = v[1]
+
+    # original Bouc-Wen model (Wen 1976)
+    psi = p['gamma'] + p['beta'] * np.sign(du * z)
+
+    F1 = p['c0'] * du + p['k0'] * (p['a'] * u + (1 - p['a']) * z)
+    F2 = dz - (p['A'] - np.abs(z)**p['n'] * psi) * du
+
+    Fint = np.array([F1,F2])
+
+    k11 = p['k0']*p['a']
+    k12 = p['k0']*(1-p['a'])
+    k21 = 0
+    k22 = (np.abs(z) * p['beta'] * np.sign(z*du) * du +
+            p['n'] * psi * np.sign(z)) * np.abs(z)**(p['n']-1) * du
+
+    c11 = p['c0']
+    c12 = 0
+    c21 = - p['A'] + np.abs(z)**p['n'] * ( psi + p['beta'] * np.sign(z*du) * z * du)
+    c22 = 1
+
+    K = np.array([[k11, k12], [k21, k22]])
+    C = np.array([[c11, c12], [c21, c22]])
+    
+    return Fint, K, C
+
+def fwd_boucWen_1DOF(t, loading, p, mass=1, y0 = [0, 0, 0], solver = "CHNL"):
+    """ Forward Bouc-Wen model for 1-DOF mass-spring system
+    loading : contains information about the applied load
+    p       : dictionary with Bouc-Wen parameters
+    mass    : mass of the 1-DOF system
+    y0      : initial conditions [u0, u_dot0, z0]
+    solver : solver to use, either "odeint" or "CHNL"
+    """
     # Solve ODE
-    y = odeint(boucWen_1DOF, y0, t, args=(loading,p,mass))
-    
-    # Store internal forces
-    Fint=[]
-    for i in range(0, len(t)):
-        f, dz = boucWen(y[i,:], p) 
-        Fint.append(f)
+    if solver == "odeint":
+        y = odeint(boucWen_1DOF, y0, t, args=(loading,p,mass))
+        
+        # Store internal forces
+        Fint = np.zeros((len(t),1))
+        for i in range(0, len(t)):
+            f, dz = boucWen(y[i,:], p) 
+            Fint[i,0] = f
 
-    sol = {'t': t,  # time (s)
-            'y': y,  # structural displacement (m)
-            'Fint': Fint}  # internal force (N)
-    
+        sol = {'t': t,         # time (s)
+                'y': y,        # structural displacement (m)
+                'Fint': Fint}  # internal force (N)
+
+    else:
+        params['M'] =  np.diag([mass, 1e-6*mass])
+        params['IC'] = np.array([0, 0, 0, 0]) # [u0,z0 , du0,dz0]
+        params['fExt'] = CHNL_fExt
+        params['fInt'] = CHNL_fInt
+
+        sol = CHNL(params)
+
     return sol
 
+def getPolarCoord(x,y):
+    """ Get polar coordinates from cartesian coordinates
+    """
+    x = x.reshape(-1,1)
 
-params = {'gamma': 0.05, 'beta': 0.5, 'A': 1, 'n': 3, 'c0': 0.5, 'k0': 1, 'a': 0.3}
+    r = np.sqrt(x**2 + y**2)
+    theta = np.arctan2(y,x)
+    return r, theta
 
-t = np.linspace(0, 120, 2400)
-loading = {'F0': 5 , 'Omega': 1.0}
+
+# define problem parameters
+t = np.linspace(0, 200, 1000)
+loading = {'F0': 0.5 , 'Omega': 1.0, 'noise': 0.3}
+sim_noise = {'y1': 0.1}
+p1_BW = {'gamma': 0.05, 'beta': 0.5,
+    'A': 2, 'n': 3, 'c0': 0.5, 'k0': 1, 'a': 0.1}
+
+# add noise in the loading
+F_noise = loading['F0'] * np.random.normal(loc=0,scale=loading['noise'],size=t.size)
+loading['F_noise'] = F_noise
+loading['t_noise'] = t
+
+params = p1_BW.copy()
+params['loading'] = loading
+params['sim_noise'] = sim_noise
+
 
 print('Start ODE integration. Running...')
 start_time = time()
 
-sol = fwd_boucWen_1DOF(t,loading,params)
+# first analysis with ODEINT solver
+sol = fwd_boucWen_1DOF(t,loading,params, solver="odeint")
 
 elapsed_time = time() - start_time
-print('Stop ODE integration, elapsed time: %.2f s' % elapsed_time)
+print('Stop ODE integration (ODEINT), elapsed time: %.2f s' % elapsed_time)
 
+npts = 500
+r_F, theta_F = getPolarCoord( sol['y'][len(t)-npts:len(t), 0] * params['k0']  , sol['Fint'][len(t)-npts:len(t)])
 
 plt.figure()
 plt.subplot(1,2,1)
-plt.plot(sol['y'][:,0],sol['Fint'])
-plt.xlabel('Displacement (m)')
+plt.plot(params['k0'] * sol['y'][:,0], sol['Fint'])
+plt.xlabel('Elastic internal force (m)')
 plt.ylabel('Internal force (N)')
 
 plt.subplot(1,2,2)
@@ -70,10 +153,70 @@ plt.plot(t,sol['y'][:,2],label='z')
 plt.xlabel('Time (s)')
 plt.ylabel('Displacement (m)')
 plt.legend()
+plt.ylim([-1,1])
+
+plt.figure()
+plt.plot(theta_F/np.pi, r_F, label='polar representation')
+plt.xlabel('Theta / pi')
+plt.ylabel('Radial forces (N)')
 
 plt.show()
 
+# Create a perturbed version of the actual parameters and try to infer them
+p1_BW0 = p1_BW.copy()
+# loop over all fields in p1_BW0 & add noise
+for key in p1_BW0:
+    p1_BW0[key] = p1_BW0[key] * ( 1 + np.random.uniform(low=-0.5,high=1.5))
+
+params0 = p1_BW0.copy()
+params0['loading'] = loading
+params0['sim_noise'] = sim_noise
+params0['loading']['F_noise'] = np.zeros(F_noise.size)
+
+sol0 = fwd_boucWen_1DOF(t,loading,params0, solver="odeint")
+r_F0, theta_F0 = getPolarCoord( sol0['y'][len(t)-npts:len(t), 0] * params['k0']  , sol0['Fint'][len(t)-npts:len(t)])
+
+
+plt.figure()
+plt.plot(theta_F/np.pi, r_F, 'o', label='polar representation')
+plt.plot(theta_F0/np.pi, r_F0, 'o', label='polar representation')
+plt.xlabel('Theta / pi')
+plt.ylabel('Radial forces (N)')
+
+
+
+
+
+
+doThis = False
+if doThis:
+    # second analysis with CHNL solver
+    params['rhoInf'] = .99
+    params['num'] = [t.size, t[-1], 1e-4, 10]
+
+    print('Start ODE integration. Running...')
+    start_time = time()
+
+    sol = fwd_boucWen_1DOF(t,loading,params)
+
+    elapsed_time = time() - start_time
+    print('Stop ODE integration (CHUNG-HULBERT), elapsed time: %.2f s' % elapsed_time)
+
+    plt.figure()
+    plt.subplot(1,2,1)
+    plt.plot(sol['disp'][0,:],sol['fInt'][0,:])
+    plt.xlabel('Displacement (m)')
+    plt.ylabel('Internal force (N)')
+
+    plt.subplot(1,2,2)
+    plt.plot(sol['time'],sol['disp'][0,:],label='displacement')
+    plt.plot(sol['time'],sol['disp'][1,:],label='z')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Displacement (m)')
+    plt.legend()
+    plt.ylim([-1,1])
+
+    plt.show()
+
 print("Done.")
 
-elapsed_time = time() - start_time
-print('Stop ODE integration, elapsed time: %.2f s' % elapsed_time)

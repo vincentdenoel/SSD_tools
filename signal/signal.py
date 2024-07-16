@@ -31,8 +31,14 @@ def vpsd(x, NFFT, DT=None, scaling=1):
             angular frequency vector, if the time step DT is given.
     """
     
-    NS, N = x.shape  # Number of signals, Number of time steps in x
-    
+    # Make sure x is organized as: nb of signals, nb of time steps
+    if x.ndim == 1:
+        NS, N = 1, len(x)
+        x = x.reshape(1, -1) # reshape to 2D array
+    else:
+        NS, N = x.shape
+
+
     if NS > N:
         x = x.T
         NS, N = x.shape
@@ -41,7 +47,7 @@ def vpsd(x, NFFT, DT=None, scaling=1):
     for i in range(NS):
         if not np.isnan(x[i, :]).all():
             x[i, np.isnan(x[i, :])] = np.nanmean(x[i, :])
-    
+
     if DT is None:
         scaling = 0
     

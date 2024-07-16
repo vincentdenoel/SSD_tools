@@ -85,6 +85,16 @@ def diff_centrale2(m, c, k, dt, p, N, dep0=0, vit0=0):
     return time, dep[1:]
 
 def CHNL(param):
+    """ Solve nonlineat dynamic problem using Chung-Hulbert method
+    param : dictionary containing the following
+    - rhoInf : spectral radius at infinity
+    - num : [nCp, h, aTol, iterMax] = [number of time steps, duration of simulation,
+         time step, tolerance on acceleration, max number of iterations per time step]]
+    - M : mass matrix
+    - IC : initial conditions [u0, v0] - size = 2*nDof
+    - fExt : external force function - format fExt = fExt(t, param)
+    - fInt : internal force function - format: fInt, K, C = fInt(u, v, param)
+    """
     # Set Chung-Hulbert parameters
     rhoInf = param['rhoInf']
     a_m = (2*rhoInf - 1) / (rhoInf + 1)
@@ -109,13 +119,13 @@ def CHNL(param):
 
     # Initialize storage arrays
     TIME = np.zeros(nCp + 1)
-    STATE = np.nan((3 * nDof, nCp + 1))
-    FINT = np.nan((nDof, nCp + 1))
-    KE = np.nan(nCp + 1)
+    STATE = np.empty((3 * nDof, nCp + 1))
+    FINT = np.empty((nDof, nCp + 1))
+    KE = np.empty(nCp + 1)
     WINT = np.zeros(nCp + 1)
 
     # Initialize local variables
-    fOld, KOld = fInt(uOld, vOld, param)
+    fOld, KOld,_ = fInt(uOld, vOld, param)
     aOld = np.linalg.solve(M, (fExt(0, param) - fOld))
     old = np.concatenate((uOld, vOld, aOld))
     tOld = 0
@@ -124,7 +134,7 @@ def CHNL(param):
     KE[0] = 0.5 * np.dot(vOld, np.dot(M, vOld))
     incr = 2
 
-    while incr <= nCp + 1:
+    while incr <= nCp:
         # Increment time
         tNew = tOld + h
 

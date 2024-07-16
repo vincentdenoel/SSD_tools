@@ -1,12 +1,18 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-# from scipy.fftpack import fft
 
 # imports from SSDpy
 from SSDpy.signal import signal
 
-def plot_tf(t, x, NFFT=None, sp=None, scaling=1, *args, **kwargs):
+""" This is a module of the SSDpy package. It contains several tools to do intersting things for Structural and Stochastic Dynamics
+Contents of this package:
+- plot_tf      Plot time and frequency domain of a signal
+- saveas       Save a Matplotlib figure as a PDF file with vector graphics
+- find_peaks   Find peaks in a signal
+"""
+
+def plot_tf(t, x, NFFT=None, sp=None, scaling=1, output=None, freq_xlim=None, *args, **kwargs):
     # set default values for optional arguments
     if sp is None:
         fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1)
@@ -14,23 +20,23 @@ def plot_tf(t, x, NFFT=None, sp=None, scaling=1, *args, **kwargs):
     if NFFT is None:
         NFFT = 512
 
-    # make sure time runs along columns
-    if x.shape[1] > x.shape[0]:
-        x = x.T
-    if t.shape[1] > t.shape[0]:
-        t = t.T
-
+    # Make sure x is organized as: nb of signals, nb of time steps
+    if x.ndim == 1:
+        x = x.reshape(1, -1) # reshape to 2D array
+    else:
+        if x.shape[1] < x.shape[0]:
+            x = x.T
 
     dt = t[1] - t[0]
 
     XX, f, *useless = signal.vpsd(x, NFFT, dt, scaling)
 
     psdX = np.zeros((XX.shape[0], XX.shape[1]))
-    for i in range(x.shape[1]):
+    for i in range(x.shape[0]):
         psdX[:, i] = XX[:, i, i]
         psdX[0, i] = np.nan
 
-    sp[0].plot(t, x, *args, **kwargs)
+    sp[0].plot(t, x.T, *args, **kwargs)
     sp[0].set_xlabel('Time [s]')
     sp[0].grid()
 
@@ -38,13 +44,19 @@ def plot_tf(t, x, NFFT=None, sp=None, scaling=1, *args, **kwargs):
     sp[1].set_xlabel('Frequency [Hz]')
     sp[1].grid()
 
+    if freq_xlim is not None:
+        sp[1].set_xlim(freq_xlim)
+
     plt.show(block=False)
 
-    if 'return' in kwargs:
-        if kwargs['return'] == 'psd':
-            return f, psdX
-        elif kwargs['return'] == 'all':
-            return f, psdX, t, x
+    if output == 'psd':
+        return f, psdX
+    elif output == 'all':
+        return f, psdX, t, x
+    elif output == 'plots':
+        return sp
+    elif output == 'psd-plots':
+        return f, psdX, sp
     else:
         return
 
@@ -69,3 +81,18 @@ def saveas(fig, folder_path, filename):
     # Save the figure as a PDF file
     file_path = os.path.join(folder_path, filename)
     fig.savefig(file_path, format='pdf')
+
+
+
+def find_peaks(x):
+    """Find the local maxima and minima of a signal x.
+    
+    Returns: the maxima, their indices, the minima, and their indices."""
+
+    x = np.array(x)
+    dx = np.diff(x)
+    iMax = np.where((dx[:-1] > 0) & (dx[1:] < 0))[0] + 1
+    iMin = np.where((dx[:-1] < 0) & (dx[1:] > 0))[0] + 1
+    M = x[iMax]
+    m = x[iMin]
+    return M, iMax, m, iMin
