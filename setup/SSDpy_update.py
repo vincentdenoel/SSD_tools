@@ -4,8 +4,7 @@ import os
 ## this code copies the SSDpy package from the local folder to the venv folder so that it can be used in other projects
 
 # define the source and destination directories
-#src_dir = "/Users/vincentDenoel/Dropbox/001_ULg/001_Recherches/MyPythonToolboxes/SSDpy"
-src_dir = "/Users/vDenoel/Dropbox/001_ULg/001_Recherches/MyPythonToolboxes/SSDpy"
+src_dir = "/Users/vincentdenoel/git/SSDpy"
 dst_dir = "/opt/anaconda3/envs/SSDpy/lib/python3.9/site-packages/SSDpy"
 
 print("\nMoving the SSD package files from\n"+src_dir+"\nto\n"+dst_dir+"\n")
