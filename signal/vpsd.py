@@ -1,13 +1,10 @@
 import numpy as np
-""" This is a module of the SSDpy package. It contains several functions to do signal processing
-Contents of this package:
-- vpsd      Computes the psd matrix of signals x
-"""
 
 def vpsd(x, NFFT, DT=None, scaling=1):
     """
     vpsd - Computes the psd matrix of signals x
     (Historically VincePSD.m)
+    This is part of the SSDpy toolbox.
 
     Parameters:
         x : numpy.ndarray

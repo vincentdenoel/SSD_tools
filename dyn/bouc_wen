@@ -111,6 +111,8 @@ def getPolarCoord(x,y):
     theta = np.arctan2(y,x)
     return r, theta
 
+def paramUpdate():
+    pass
 
 # define problem parameters
 t = np.linspace(0, 200, 1000)
@@ -184,7 +186,80 @@ plt.xlabel('Theta / pi')
 plt.ylabel('Radial forces (N)')
 
 
+# Do Bayesian inferrence
+u0  = sol0['y'][:,0]
+du0 = sol0['y'][:,1]
 
+# Initialize average x0_0 and covariance matrix P0_0
+x0_0 = np.array([0, 0.05, 0.5, 0.5, 1, 0.1, 2, 3])
+P0_0 = np.diag([0.1, 0.01, 0.1, 0.1, 0.1, 0.01, 0.1, 0.1])
+
+Q = np.diag([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) * 10
+R = 0.05
+
+k=0
+mu_x_mm = x0_0
+P_x_mm = P0_0
+
+save_mu_x_nn = np.zeros((len(t),8))
+save_P_x_nn = np.zeros((len(t),8,8))
+
+dt = t[1] - t[0]
+while k < len(t):
+    print('Iteration %d' % k)
+    # Generate prior samples assuming multivariate normal distribution
+    x_mm = np.random.multivariate_normal(mu_x_mm, P_x_mm, 50000)
+    x_mm = x_mm[x_mm[:,0] > 0,:]
+    x_mm = x_mm[x_mm[:,1] > 0,:]
+    x_mm = x_mm[x_mm[:,2] > 0,:]
+    x_mm = x_mm[x_mm[:,3] > 0,:]
+    x_mm = x_mm[x_mm[:,4] > 0,:]
+    x_mm = x_mm[x_mm[:,5] > 0,:]
+    x_mm = x_mm[x_mm[:,6] > 0,:]
+    x_mm = x_mm[x_mm[:,7] > 0,:]
+    x_mm = x_mm[x_mm[:,7] < 6,:]
+    # Time update
+    f = x_mm[:,0] + dt * (x_mm[:,6] - np.abs(x_mm[:,0]) ** x_mm[:,7] * (x_mm[:,1] + x_mm[:,2] * np.sign(du0[k] * x_mm[:,0]))) * du0[k] 
+    f = f[f > 0]
+    mu_x_nm = np.zeros((8,))
+    mu_x_nm[0] = np.mean(f)
+    P_x_nm = np.zeros((8,8))
+    P_x_nm[0,0] = np.var(f)
+    P_x_nm = P_x_nm + Q
+    # Generate predictive samples
+    x_nm = np.random.multivariate_normal(mu_x_nm, P_x_nm, 50000)
+    # If exponent is negative or large than 6, remove it
+    x_nm = x_nm[x_nm[:,0] > 0,:]
+    x_nm = x_nm[x_nm[:,1] > 0,:]
+    x_nm = x_nm[x_nm[:,2] > 0,:]
+    x_nm = x_nm[x_nm[:,3] > 0,:]
+    x_nm = x_nm[x_nm[:,4] > 0,:]
+    x_nm = x_nm[x_nm[:,5] > 0,:]
+    x_nm = x_nm[x_nm[:,6] > 0,:]
+    x_nm = x_nm[x_nm[:,7] > 0,:]
+    x_nm = x_nm[x_nm[:,7] < 6,:]
+    
+    # measurement update
+    h = x_nm[:,3] * du0[k] + x_nm[:,4] * (x_nm[:,5] * u0[k] + (1 - x_nm[:,5]) * x_nm[:,0])
+    mu_y_nm = np.mean(h)
+    P_y_nm = np.var(h) + R
+    P_xy_nm = np.dot(h.T,x_nm) - mu_x_nm * mu_y_nm
+    # Kalman gain
+    K = P_xy_nm / P_y_nm
+    # Update
+    mu_x_nn = mu_x_nm + K * (sol['Fint'][k] - mu_y_nm)
+    P_x_nn = P_x_nm - K * P_y_nm * K.T * 0.0001
+    # Store in memory
+    save_mu_x_nn[k,:] = mu_x_nn
+    save_P_x_nn[k,:,:] = P_x_nn
+    
+    print(mu_x_nn)
+    print(P_x_nn)
+    print(np.min(np.linalg.eigvals(P_x_nn)))
+    # Advance
+    mu_x_mm = mu_x_nn
+    P_x_mm = P_x_nn
+    k = k + 1
 
 
 
