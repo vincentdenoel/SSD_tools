@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # imports from SSDpy
-from SSDpy.signal import vpsd
+from SSDpy.signal.vpsd import vpsd
 
 
 def plot_tf(t, x, NFFT=None, sp=None, scaling=1, output=None, freq_xlim=None, *args, **kwargs):
