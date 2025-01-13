@@ -84,6 +84,51 @@ def diff_centrale2(m, c, k, dt, p, N, dep0=0, vit0=0):
     time = np.linspace(0.,N*dt,N)
     return time, dep[1:]
 
+
+# Function for DiffCentraleElastoPlastique (converted from MATLAB to Python)
+def DiffCentraleElastoPlastique(m, k1, k2, p, DT, Nstep, d1):
+    dep = np.zeros(Nstep)
+    vit = np.zeros(Nstep)
+    f = np.zeros(Nstep)
+    reg = np.zeros(Nstep)
+
+    regime = 1
+    for i in range(1, Nstep-1):
+        if regime == 1:  # Elastic
+            f[i] = k1 * dep[i]
+        elif regime == 2:  # Augmenting plastic state dep(i) > 0
+            f[i] = k1 * d1 + k2 * (dep[i] - d1)
+        elif regime == 3:  # Elastic unloading
+            f[i] = k1 * (dep[i] - dR)
+        elif regime == 4:  # Augmenting plastic state dep(i) < 0
+            f[i] = -k1 * d1 + k2 * (dep[i] + d1)
+
+        # Update displacement using central difference scheme
+        dep[i + 1] = (DT**2 / m) * (p[i] - f[i]) + 2 * dep[i] - dep[i - 1]
+        vit[i + 1] = (dep[i + 1] - dep[i]) / DT
+        reg[i] = regime
+        
+        if regime == 1:
+            if vit[i] > 0 and dep[i] > d1:
+                regime = 2
+            elif vit[i] < 0 and dep[i] < -d1:
+                regime = 4
+        elif regime == 2:
+            if vit[i] < 0:
+                regime = 3
+                dR = dep[i] - f[i] / k1
+        elif regime == 3:
+            if vit[i] > 0 and dep[i] > d1 + k1 / (k1 - k2) * dR:
+                regime = 2
+            elif vit[i] < 0 and dep[i] < -d1 + k1 / (k1 - k2) * dR:
+                regime = 4
+        elif regime == 4:
+            if vit[i] > 0:
+                regime = 3
+                dR = dep[i] - f[i] / k1
+
+    return dep, f, reg
+
 def CHNL(param):
     """ Solve nonlineat dynamic problem using Chung-Hulbert method
     param : dictionary containing the following

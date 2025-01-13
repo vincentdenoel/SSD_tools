@@ -1,0 +1,63 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+from EOMsolvers import DiffCentraleElastoPlastique as diffCentralEP
+
+# Structural data
+m = 1
+k1 = 1
+k2 = 0
+d1 = 1
+d2 = 1000  # Useless, choose it large enough
+
+omega = np.sqrt(k1 / m)
+T1 = 2 * np.pi / omega
+R = k1 * d1
+
+# List of time durations (Td)
+listTd = 10 ** np.arange(-3, 2.05, 0.05)
+listR = [0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.02, 1.04, 1.08, 1.16, 1.32, 1.4, 1.6, 1.8, 2]
+
+# Main loop to compute ductility
+ductility = np.zeros((len(listTd), len(listR)))
+
+for i2 in range(len(listR)):
+    print (i2)
+    for i1 in range(len(listTd)):
+        Td = listTd[i1] * T1
+        DT = min([Td, T1]) / 100
+        P = R / listR[i2]
+
+        nL = int(Td / DT)
+        Nstep = 40 * nL
+        time = np.arange(Nstep) * DT
+
+        # Force profile - rectangular pulse (type 2)
+        p = P * np.concatenate([np.ones(nL), np.zeros(Nstep - nL)])
+
+        # Call DiffCentraleElastoPlastique function
+        dep2, fint2, regime2 = diffCentralEP(m, k1, k2, p, DT, Nstep, d1)
+        
+        # Calculate ductility
+        ductility[i1, i2] = np.max(np.abs(dep2 / d1))
+
+# Plotting results
+plt.figure(figsize=(12, 6))
+
+# Plotting Ductility vs Td/T
+plt.subplot(121)
+plt.loglog(listTd, ductility)
+plt.xlabel(r'$t_d / T$')
+plt.ylabel(r'$\mu$')
+plt.ylim([0.1, 100])
+
+# Plotting Ductility vs R/P
+plt.subplot(122)
+plt.semilogy(listR, ductility.T)  # Transpose to match dimensions for plotting
+plt.xlabel(r'$R / P$')
+plt.ylabel(r'$\mu$')
+plt.ylim([0.1, 100])
+
+plt.tight_layout()
+plt.show()
+
