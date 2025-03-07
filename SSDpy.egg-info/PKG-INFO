@@ -1,0 +1,14 @@
+Metadata-Version: 2.2
+Name: SSDpy
+Version: 0.1
+Summary: A collection of tools from the Structural and Stochastic Dynamics
+Author: SSD research group at the University of Liège - supervised by V. Denoël
+Author-email: ssd@uliege.be
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib
+Dynamic: author
+Dynamic: author-email
+Dynamic: requires-dist
+Dynamic: summary
