@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
+import SSDpy as ssd
 
-from SSDpy.tools import tools as ssdtools
+#from SSDpy.tools import tools as ssdtools
 
 
 def log_decrement(t, y, t0=None, t1=None, DoPlot=True, F=None):
@@ -43,8 +44,8 @@ def log_decrement(t, y, t0=None, t1=None, DoPlot=True, F=None):
     tw = t[i0:i1]
     
     # find peaks in v
-    M, iM, *useless = ssdtools.find_peaks(v)
-    m, im, *useless = ssdtools.find_peaks(-v)
+    M, iM, *useless = ssd.find_peaks(v)
+    m, im, *useless = ssd.find_peaks(-v)
     
     MM = M.copy()
     mm = m.copy()
