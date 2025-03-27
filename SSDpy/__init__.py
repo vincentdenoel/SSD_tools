@@ -6,11 +6,18 @@ from .constitutive.constlaws import boucWen
 
 from .dyn.EOMsolvers import newmark, NewmarkMDDL
 from .dyn.log_decrement import log_decrement
+from .dyn.damping import RayleighDamping
 
 from .gcdc import gcdc_tools
 
+from .num import winkler
+
+from .num.nonlin import example_structures
+from .num.nonlin import nonlin_FEM
+
 from .plot import my_colormap as cmp
 from .plot.plot_tf import plot_tf
+from .plot.plot_settings import plot_settings
 
 from .signal.envelopes import envelopes
 from .signal.findpeaks import findpeaks
