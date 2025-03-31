@@ -155,6 +155,7 @@ def CHNL(param):
 
     # Get model parameters
     M = param['M']
+    M = np.atleast_2d(M)
     nDof = M.shape[0]
     ind = np.arange(0, nDof)
     uOld = param['IC'][ind]
