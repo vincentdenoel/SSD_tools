@@ -29,6 +29,7 @@ from .tools.clipfig import clipfig
 from .tools.matlab import read_mat_file
 from .tools.saveas import saveas
 
+from .wind.bamm import bamm
 from .wind.gpvm import gpvm
 #from .wind.tornado_model.tornado_model import tornado_model
 from .wind.wind_psd import wind_psd
