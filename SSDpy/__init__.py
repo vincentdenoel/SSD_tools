@@ -15,6 +15,8 @@ from .num import winkler
 from .num.nonlin import example_structures
 from .num.nonlin import nonlin_FEM
 
+from .num.plates import plate12DOFs
+
 from .plot import my_colormap as cmp
 from .plot.plot_tf import plot_tf
 from .plot.plot_settings import plot_settings
