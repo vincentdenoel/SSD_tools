@@ -20,6 +20,7 @@ from .num.plates import plate12DOFs
 from .plot import my_colormap as cmp
 from .plot.plot_tf import plot_tf
 from .plot.plot_settings import plot_settings
+from .plot.my_colormap import get_cmap
 
 from .signal.envelopes import envelopes
 from .signal.findpeaks import findpeaks

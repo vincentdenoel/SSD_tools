@@ -35,7 +35,9 @@ def BeamElasticFoundation(EI, k, L, p, x_hinge=None):
                 [6*dx,     2*dx**2, -6*dx,    4*dx**2]
             ]) * (EI / dx**3)
 
-            Ke += np.diag([0.5, 0, 0.5, 0]) * k * dx
+            #Ke += np.diag([0.5, 0, 0.5, 0]) * k * dx
+            Ke += np.diag([0.5, dx/12, 0.5, -dx/12]) * k * dx
+
             idof = slice(2*iel, 2*iel+4)
             K[idof, idof] += Ke
     else:
