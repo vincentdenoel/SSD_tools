@@ -30,7 +30,7 @@ def load_structure(cas):
         listfree = np.setdiff1d(np.arange(1, ndof + 1), listfix)  # List of free dofs
 
         # Which degrees-of-freedom to plot
-        dofobs = 4
+        dofobs = [4]
         
     elif cas == 2:
         # Node coordinates - there are 3 nodes (0,1), (1,1) and (1,0)
@@ -60,7 +60,7 @@ def load_structure(cas):
         listfree = np.setdiff1d(np.arange(1, ndof + 1), listfix)  # List of free dofs
 
         # Which degrees-of-freedom to plot
-        dofobs = 5
+        dofobs = [5]
 
     elif cas == 3:
         # Node coordinates
@@ -88,7 +88,7 @@ def load_structure(cas):
         listfree = np.setdiff1d(np.arange(1, ndof + 1), listfix)  # List of free dofs
 
         # Which degrees-of-freedom to plot
-        dofobs = 18
+        dofobs = [18]
 
     elif cas == 4:
         # Node coordinates

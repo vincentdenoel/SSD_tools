@@ -439,7 +439,8 @@ if __name__ == "__main__":
     plt.ion()
 
     # Load structure
-    xnod, ynod, elemnoa, elemnob, ndof, EA, dofload, p, listfix, dofobs = ssd.example_structures.load_structure(4)
+    istructure = 1  # Example structure number
+    xnod, ynod, elemnoa, elemnob, ndof, EA, dofload, p, listfix, dofobs = ssd.example_structures.load_structure(istructure)
 
     # Plot initial configuration
     plt.figure()
