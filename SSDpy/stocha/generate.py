@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.linalg import eigh
-from scipy.integrate import trapz
+from numpy import trapz
 import matplotlib.pyplot as plt
 
 
@@ -52,13 +52,13 @@ def generate_samples(hdl_s, t, f_calcul):
             V.append(eigvecs)
             D.append(eigvals)
 
-    cov_target = trapz(4 * np.pi * f_calcul, S, axis=2)
+    #cov_target = trapz(4 * np.pi * f_calcul, S, axis=2)
 
     Nhist = S.shape[0]
     NModes = Nhist
 
     # Generate modal processes
-    Nu = np.zeros((n, NModes), dtype=np.complex_)
+    Nu = np.zeros((n, NModes), dtype=np.complex128)
 
     for m in range(NModes):
         Vrm = interp1d(f_calcul, D[m, :], kind="linear", fill_value="extrapolate")(f)
@@ -71,8 +71,8 @@ def generate_samples(hdl_s, t, f_calcul):
         Nu[n // 2 + 1:, m] = np.conj(Nu[n // 2 - 1:0:-1, m])
 
     # Generate nodal processes
-    ZMAT = np.zeros((n, NModes), dtype=np.complex_)
-    X = np.zeros((n, Nhist), dtype=np.complex_)
+    ZMAT = np.zeros((n, NModes), dtype=np.complex128)
+    X = np.zeros((n, Nhist), dtype=np.complex128)
 
     for h in range(Nhist):
         for m in range(NModes):

@@ -26,11 +26,16 @@ from .signal.envelopes import envelopes
 from .signal.findpeaks import findpeaks
 from .signal.phase import phase
 from .signal.histv import histv
+from .signal.hist_plots import histv_plots
 from .signal.vpsd import vpsd
 
-from .tools.clipfig import clipfig
+from .stocha.generate import generate_samples
+
+from .tools.clipfig import clipfig, extract_figure_data, recreate_figure, duplfig
 from .tools.matlab import read_mat_file
 from .tools.saveas import saveas
+from .tools.plot_compress import plot_compress
+
 
 
 from .wind.gpvm import gpvm

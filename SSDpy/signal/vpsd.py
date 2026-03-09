@@ -50,7 +50,7 @@ def vpsd(x, NFFT, DT=None, scaling=1):
     
     Nblocs = N // NFFT
 
-    PSD = np.zeros((NFFT // 2, NS, NS))
+    PSD = np.zeros((int(NFFT // 2), NS, NS))
 
     # Build Hanning window
     t = np.linspace(0, 1, NFFT)
