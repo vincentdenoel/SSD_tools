@@ -1,58 +1,14 @@
 import csv
 import pandas as pd
+import pandas as pd
 import datetime
+import itertools
 import itertools
 import numpy as np
 from scipy.signal import butter, filtfilt
 from scipy.interpolate import interp1d
 
-
-units = []
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002DA64743'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002FD3B45E'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC100287EA8D2'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002617A2D8'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC10027233E8E'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002DF160DF'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002A9BEA64'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002B202393'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC100247C9CE5'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002B999430'})
-units.append({'type': 'USB Accelerometer X2-5', 'sn': 'SN:CCDC1002B561590'})
-
-units.append({'type': 'Yellow Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC10211F02908'})
-units.append({'type': 'Yellow Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC102146158B8'})
-units.append({'type': 'Yellow Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC10219779497'})
-units.append({'type': 'Yellow Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1021AF3B8A3'})
-units.append({'type': 'Yellow Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC10211C00096'})
-units.append({'type': 'Yellow Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1021DFA9251'})
-
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024B914DD1'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC102409F5D60'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC10244958AC9'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024D6F212C'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024C4F757B'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024CDCE843'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC10248C0A964'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024F332121'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024993A4A7'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC1024097F14B'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC102475E2297'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': 'SN:CCDC10243E239F6'})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': ''})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': ''})
-units.append({'type': 'Black Multifunction Extended Life (MEL) Data Logger', 'sn': ''})
-
-
-
-def importGCDC(filename, start_date=None, headerOnly=False, verbose=False, force_gravity='z'):
-    # Import GCDC data from a CSV file.
-    # filename: path to the CSV file
-    # start_date: optional, if provided, shifts the time to start from this date (datetime or string)
-    # headerOnly: if True, only reads the header and returns info, None
-    # verbose: if True, prints additional information
-    # force_gravity: 'x', 'y', or 'z' to force the gravity axis direction - Use None to disable
-
+def importGCDC(filename, headerOnly=False):
     # Define structure for storing information
     info = {}
 
@@ -123,59 +79,25 @@ def importGCDC(filename, start_date=None, headerOnly=False, verbose=False, force
         return None, None
 
     if headerOnly:
-        return info, None
+        return info, None, None, None, None
 
-    print('Importing GCDC data from file:', filename)
-    if verbose:
-        print('Device type:', info['deviceType'])
-        print('Serial number:', info['serial'])
-        print('Sampling rate:', info['sampling'], 'Hz')
-        print('Start date:', info.get('start-date', 'N/A'))
-        print('Start time:', info.get('start-time', 'N/A'))
+    # Read data from file
+    print('\nReading file: {} ...\n  on device (serial): {}\n  Start date & time: {}\n'.format(
+        filename, info['serial'], info['start'].strftime('%a %d-%b-%Y %H:%M:%S')))
 
-    df = pd.read_csv(
-        filename,
-        skiprows=skiplines,
-        header=None,               # no header row in your data
-        names=['time', 'acc-x', 'acc-y', 'acc-z']  # you can change names as needed
-    )
-    df = df.iloc[:-1]
-    
-    # check type of df['time'] and make sure the csv import treated it as a float
-    if df['time'].dtype == 'object':
-        try:
-            pd.to_numeric(df['time'], errors='coerce') 
-        except ValueError:
-            print("Error converting time column to datetime. Please check the format.")
-            return info, None
-        
-    if unit_type == 'USB Accelerometer X2-5':
-        pass  # TO DO: implement USB Accelerometer X2-5 data import
+    with open(filename, 'r') as file:
+        reader = csv.reader(file)
+        for i in range(8):
+            next(reader)  # Skip first 7 lines (header)
 
-    elif unit_type == 'Yellow Multifunction Extended Life (MEL) Data Logger':
-        time = df['time'].values.astype('float64')
-        ax = pd.to_numeric(df['acc-x'], errors='coerce') / info['sensitivity']
-        ay = pd.to_numeric(df['acc-y'], errors='coerce') / info['sensitivity']
-        az = pd.to_numeric(df['acc-z'], errors='coerce') / info['sensitivity']
+        # Read data into arrays
+        data = list(reader)
+        time = [float(row[0]) for row in data[:-1]]
+        ax = [float(row[1]) for row in data[:-1]]
+        ay = [float(row[2]) for row in data[:-1]]
+        az = [float(row[3]) for row in data[:-1]]
 
-    elif unit_type == 'Black Multifunction Extended Life (MEL) Data Logger':
-        time = df['time'].values.astype('float64')
-        ax = pd.to_numeric(df['acc-x'], errors='coerce') / info['sensitivity']
-        ay = pd.to_numeric(df['acc-y'], errors='coerce') / info['sensitivity']
-        az = pd.to_numeric(df['acc-z'], errors='coerce') / info['sensitivity']
-
-
-        # check glitches in the data and correct them
-        if len(ax) > 1:
-            ax, ay, az = detect_and_correct_glitches(ax, ay, az, force_gravity=force_gravity)
-        
-
-    if len(time)==0:
-        print('No data found in the file.')
-        return info, None
-    
-
-    # Low-pass, then resample the data
+    # Resample for better accuracy
     b, a = butter(8, 0.90)
     if len(df['acc-x']) > 24:
         ax = filtfilt(b, a, ax)

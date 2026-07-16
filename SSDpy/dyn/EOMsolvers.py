@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm.auto import tqdm
 
 def newmark(m, xi, f, p, dt, Nstep, a=0.25, d=0.5, dep0=0, vit0=0):
     
@@ -175,54 +176,86 @@ def CHNL(param):
     aOld = np.linalg.solve(M, (fExt(0, param) - fOld))
     old = np.concatenate((uOld, vOld, aOld))
     tOld = 0
+    # Initial conditions at index 0
     STATE[:, 0] = old
     FINT[:, 0] = fOld
     KE[0] = 0.5 * np.dot(vOld, np.dot(M, vOld))
-    incr = 2
 
-    while incr <= nCp:
-        # Increment time
-        tNew = tOld + h
+    incr = 1
 
-        # Compute predictor
-        uPred = uOld + h * vOld + h**2 * (0.5 - beta) * aOld
-        vPred = vOld + h * (1 - gamma) * aOld
-        aNew = aOld.copy()
+    with tqdm(total=nCp, desc="CHNL", unit="step") as pbar:
+        while incr <= nCp:
+            tNew = tOld + h
 
-        # Enter iterative loop
-        fNew, KNew, CNew = fInt(uPred, vPred, param)
-        rNew = np.dot(M, ((1 - a_m) * aNew + a_m * aOld)) + \
-               (1 - a_f) * (fNew - fExt(tNew, param)) + a_f * (fOld - fExt(tOld, param))
-        iter = 1
-        err = np.linalg.norm(rNew)
-        if param.get('debug', 0) > 0:
-            print('INCR:', incr)
-            print(f'   ITER: {iter} - RES: {err:.3e}')
-        while (iter <= iterMax and err > aTol) or iter == 1:
-            JNew = JACOBIAN(h, KNew, CNew, M, beta, gamma, a_m, a_f)
-            corr = -np.linalg.solve(JNew, rNew)
-            aNew += corr
-            uNew = uPred + h**2 * beta * aNew
-            vNew = vPred + h * gamma * aNew
-            fNew, KNew, CNew = fInt(uNew, vNew, param)
-            rNew = np.dot(M, ((1 - a_m) * aNew + a_m * aOld)) + \
-                   (1 - a_f) * (fNew - fExt(tNew, param)) + a_f * (fOld - fExt(tOld, param))
+            # Compute predictor
+            uPred = uOld + h * vOld + h**2 * (0.5 - beta) * aOld
+            vPred = vOld + h * (1 - gamma) * aOld
+            aNew = aOld.copy()
+
+            # Newton iteration
+            fNew, KNew, CNew = fInt(uPred, vPred, param)
+
+            rNew = (
+                M @ ((1 - a_m) * aNew + a_m * aOld)
+                + (1 - a_f) * (fNew - fExt(tNew, param))
+                + a_f * (fOld - fExt(tOld, param))
+            )
+
+            iteration = 1
             err = np.linalg.norm(rNew)
-            iter += 1
-            if param.get('debug', 0) > 0:
-                print(f'   ITER: {iter} - RES: {err:.3e}')
-        assert np.linalg.norm(rNew) < aTol, 'CHNL:NR:failed to converge'
-        TIME[incr] = tNew
-        STATE[:, incr] = np.concatenate((uNew, vNew, aNew))
-        FINT[:, incr] = fNew
-        KE[incr] = 0.5 * np.dot(vNew, np.dot(M, vNew))
-        WINT[incr] = WINT[incr - 1] + fIntWork(h, fOld, fNew, uOld, uNew, vOld, vNew, KOld, KNew)
-        tOld = tNew
-        uOld = uNew
-        vOld = vNew
-        aOld = aNew
-        fOld = fNew
-        incr += 1
+
+            while (iteration <= iterMax and err > aTol) or iteration == 1:
+                JNew = JACOBIAN(
+                    h, KNew, CNew, M,
+                    beta, gamma, a_m, a_f
+                )
+
+                corr = -np.linalg.solve(JNew, rNew)
+                aNew += corr
+
+                uNew = uPred + h**2 * beta * aNew
+                vNew = vPred + h * gamma * aNew
+
+                fNew, KNew, CNew = fInt(uNew, vNew, param)
+
+                rNew = (
+                    M @ ((1 - a_m) * aNew + a_m * aOld)
+                    + (1 - a_f) * (fNew - fExt(tNew, param))
+                    + a_f * (fOld - fExt(tOld, param))
+                )
+
+                err = np.linalg.norm(rNew)
+                iteration += 1
+
+            assert err < aTol, (
+                f"CHNL: Newton-Raphson failed at step {incr}: "
+                f"residual={err:.3e}"
+            )
+
+            TIME[incr] = tNew
+            STATE[:, incr] = np.concatenate((uNew, vNew, aNew))
+            FINT[:, incr] = fNew
+            KE[incr] = 0.5 * np.dot(vNew, M @ vNew)
+
+            WINT[incr] = (
+                WINT[incr - 1]
+                + fIntWork(
+                    h, fOld, fNew,
+                    uOld, uNew,
+                    vOld, vNew,
+                    KOld, KNew,
+                )
+            )
+
+            tOld = tNew
+            uOld = uNew
+            vOld = vNew
+            aOld = aNew
+            fOld = fNew
+            KOld = KNew
+
+            incr += 1
+            pbar.update(1)
 
     sol = {'time': TIME,
            'disp': STATE[ind, :],
@@ -245,3 +278,203 @@ def fIntWork(h, fOld, fNew, uOld, uNew, vOld, vNew, KOld, KNew):
     dwInt = 0.5 * np.dot(du, fOld + fNew) - \
             h / 12 * (np.dot(vNew - vOld, fNew - fOld) - np.dot(du, np.dot(KNew, vNew) - np.dot(KOld, vOld)))
     return dwInt
+
+def CHNLTV(param):
+    """
+    Solve a nonlinear time varying dynamic problem using the Chung-Hulbert method.
+
+    Required entries in param
+    -------------------------
+    rhoInf : float
+        Spectral radius at infinity.
+
+    num : sequence
+        [nCp, duration, aTol, iterMax].
+
+    M : array_like
+        Mass matrix.
+
+    IC : array_like
+        Initial conditions [u0, v0], with size 2*nDof.
+
+    fExt : callable
+        External force:
+            fExt(t, param)
+
+    fInt : callable
+        Time-dependent internal force:
+            fInt, K, C = fInt(t, u, v, param)
+    """
+
+    # Chung-Hulbert parameters
+    rhoInf = param["rhoInf"]
+    a_m = (2 * rhoInf - 1) / (rhoInf + 1)
+    a_f = rhoInf / (rhoInf + 1)
+    beta = 0.25 * (1 - a_m + a_f) ** 2
+    gamma = 0.5 - a_m + a_f
+
+    # Integration parameters
+    nCp = param["num"][0]
+    duration = param["num"][1]
+    aTol = param["num"][2]
+    iterMax = param["num"][3]
+
+    h = duration / nCp
+
+    # Model parameters
+    M = np.atleast_2d(param["M"])
+    nDof = M.shape[0]
+
+    ind = np.arange(nDof)
+
+    uOld = np.asarray(param["IC"][ind], dtype=float)
+    vOld = np.asarray(param["IC"][ind + nDof], dtype=float)
+
+    fExt = param["fExt"]
+    fInt = param["fInt"]
+
+    # Storage
+    TIME = np.zeros(nCp + 1)
+    STATE = np.empty((3 * nDof, nCp + 1))
+    FINT = np.empty((nDof, nCp + 1))
+    KE = np.empty(nCp + 1)
+    WINT = np.zeros(nCp + 1)
+
+    tOld = 0.0
+
+    # Time is now passed to fInt.
+    fOld, KOld, COld = fInt(tOld, uOld, vOld, param)
+
+    aOld = np.linalg.solve(
+        M,
+        np.asarray(fExt(tOld, param)) - np.asarray(fOld),
+    )
+
+    STATE[:, 0] = np.concatenate((uOld, vOld, aOld))
+    FINT[:, 0] = fOld
+    KE[0] = 0.5 * np.dot(vOld, M @ vOld)
+
+    incr = 1
+
+    with tqdm(total=nCp, desc="CHNL", unit="step") as pbar:
+        while incr <= nCp:
+            tNew = tOld + h
+
+            # Predictor
+            uPred = (
+                uOld
+                + h * vOld
+                + h**2 * (0.5 - beta) * aOld
+            )
+
+            vPred = vOld + h * (1 - gamma) * aOld
+            aNew = aOld.copy()
+
+            # Initial evaluation at the new time.
+            fNew, KNew, CNew = fInt(
+                tNew,
+                uPred,
+                vPred,
+                param,
+            )
+
+            rNew = (
+                M @ ((1 - a_m) * aNew + a_m * aOld)
+                + (1 - a_f)
+                * (fNew - np.asarray(fExt(tNew, param)))
+                + a_f
+                * (fOld - np.asarray(fExt(tOld, param)))
+            )
+
+            iteration = 1
+            err = np.linalg.norm(rNew)
+
+            while iteration <= iterMax and (
+                err > aTol or iteration == 1
+            ):
+                JNew = JACOBIAN(
+                    h,
+                    KNew,
+                    CNew,
+                    M,
+                    beta,
+                    gamma,
+                    a_m,
+                    a_f,
+                )
+
+                corr = -np.linalg.solve(JNew, rNew)
+                aNew += corr
+
+                uNew = uPred + h**2 * beta * aNew
+                vNew = vPred + h * gamma * aNew
+
+                # Noise remains fixed at tNew during Newton iterations.
+                fNew, KNew, CNew = fInt(
+                    tNew,
+                    uNew,
+                    vNew,
+                    param,
+                )
+
+                rNew = (
+                    M @ ((1 - a_m) * aNew + a_m * aOld)
+                    + (1 - a_f)
+                    * (fNew - np.asarray(fExt(tNew, param)))
+                    + a_f
+                    * (fOld - np.asarray(fExt(tOld, param)))
+                )
+
+                err = np.linalg.norm(rNew)
+                iteration += 1
+
+            if err >= aTol:
+                raise RuntimeError(
+                    "CHNL: Newton-Raphson failed at "
+                    f"step {incr}, t={tNew:.6g}, "
+                    f"residual={err:.3e}, "
+                    f"iterations={iteration - 1}."
+                )
+
+            TIME[incr] = tNew
+            STATE[:, incr] = np.concatenate(
+                (uNew, vNew, aNew)
+            )
+            FINT[:, incr] = fNew
+            KE[incr] = 0.5 * np.dot(vNew, M @ vNew)
+
+            WINT[incr] = (
+                WINT[incr - 1]
+                + fIntWork(
+                    h,
+                    fOld,
+                    fNew,
+                    uOld,
+                    uNew,
+                    vOld,
+                    vNew,
+                    KOld,
+                    KNew,
+                )
+            )
+
+            tOld = tNew
+            uOld = uNew
+            vOld = vNew
+            aOld = aNew
+            fOld = fNew
+            KOld = KNew
+            COld = CNew
+
+            incr += 1
+            pbar.update(1)
+
+    return {
+        "time": TIME,
+        "disp": STATE[ind, :],
+        "velo": STATE[ind + nDof, :],
+        "accel": STATE[ind + 2 * nDof, :],
+        "fInt": FINT,
+        "KE": KE,
+        "WINT": WINT,
+    }
